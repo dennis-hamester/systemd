@@ -104,6 +104,7 @@ static int netdev_bridge_post_create(NetDev *netdev, Link *link, sd_netlink_mess
         _cleanup_(sd_netlink_message_unrefp) sd_netlink_message *req = NULL;
         Bridge *b;
         int r;
+        struct br_boolopt_multi boolopt = {};
 
         assert(netdev);
 
@@ -200,10 +201,22 @@ static int netdev_bridge_post_create(NetDev *netdev, Link *link, sd_netlink_mess
                         return log_netdev_error_errno(netdev, r, "Could not append IFLA_BR_STP_STATE attribute: %m");
         }
 
+        if (b->mcast_vlan_snooping >= 0) {
+                boolopt.optval |= (b->mcast_vlan_snooping > 0) ? (1 << BR_BOOLOPT_MCAST_VLAN_SNOOPING) : 0;
+                boolopt.optmask |= 1 << BR_BOOLOPT_MCAST_VLAN_SNOOPING;
+        }
+
         if (b->igmp_version > 0) {
                 r = sd_netlink_message_append_u8(req, IFLA_BR_MCAST_IGMP_VERSION, b->igmp_version);
                 if (r < 0)
                         return log_netdev_error_errno(netdev, r, "Could not append IFLA_BR_MCAST_IGMP_VERSION attribute: %m");
+        }
+
+        if (boolopt.optmask) {
+                r = sd_netlink_message_append_data(req, IFLA_BR_MULTI_BOOLOPT,
+                                                   &boolopt, sizeof(struct br_boolopt_multi));
+                if (r < 0)
+                        return r;
         }
 
         r = sd_netlink_message_close_container(req);
@@ -426,6 +439,7 @@ static void bridge_init(NetDev *n) {
         b->vlan_filtering = -1;
         b->vlan_protocol = -1;
         b->stp = -1;
+        b->mcast_vlan_snooping = -1;
         b->default_pvid = VLANID_INVALID;
         b->forward_delay = USEC_INFINITY;
         b->ageing_time = USEC_INFINITY;

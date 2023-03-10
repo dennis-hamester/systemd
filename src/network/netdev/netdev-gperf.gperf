@@ -220,6 +220,7 @@ Bridge.MulticastSnooping,                 config_parse_tristate,                
 Bridge.VLANFiltering,                     config_parse_tristate,                     0,                             offsetof(Bridge, vlan_filtering)
 Bridge.VLANProtocol,                      config_parse_vlanprotocol,                 0,                             offsetof(Bridge, vlan_protocol)
 Bridge.STP,                               config_parse_tristate,                     0,                             offsetof(Bridge, stp)
+Bridge.MulticastVLANSnooping,             config_parse_tristate,                     0,                             offsetof(Bridge, mcast_vlan_snooping)
 Bridge.MulticastIGMPVersion,              config_parse_uint8,                        0,                             offsetof(Bridge, igmp_version)
 BridgeVLAN.VLAN,                          config_parse_bridge_vlan,                  0,                             0
 BridgeVLAN.MulticastSnooping,             config_parse_bridge_vlan_mcast_snooping,   0,                             0

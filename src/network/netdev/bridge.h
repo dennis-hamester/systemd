@@ -27,6 +27,7 @@ typedef struct Bridge {
         int vlan_filtering;
         int vlan_protocol;
         int stp;
+        int mcast_vlan_snooping;
         uint16_t priority;
         uint16_t group_fwd_mask;
         uint16_t default_pvid;
