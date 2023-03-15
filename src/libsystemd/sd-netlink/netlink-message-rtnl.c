@@ -1149,3 +1149,21 @@ int sd_rtnl_message_new_mdb(sd_netlink *rtnl, sd_netlink_message **ret, uint16_t
 
         return 0;
 }
+
+int sd_rtnl_message_new_vlan(sd_netlink *nl, sd_netlink_message **ret, uint16_t msg_type, int ifindex) {
+        struct br_vlan_msg *bvm;
+        int r;
+
+        assert_return(rtnl_message_type_is_vlan(msg_type), -EINVAL);
+        assert_return(ret, -EINVAL);
+
+        r = message_new(nl, ret, msg_type);
+        if (r < 0)
+                return r;
+
+        bvm = NLMSG_DATA((*ret)->hdr);
+        bvm->family = AF_BRIDGE;
+        bvm->ifindex = ifindex;
+
+        return 0;
+}

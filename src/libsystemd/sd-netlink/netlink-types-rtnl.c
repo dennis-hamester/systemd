@@ -1188,6 +1188,31 @@ static const NLType rtnl_mdb_types[] = {
 
 DEFINE_TYPE_SYSTEM(rtnl_mdb);
 
+static const NLType rtnl_vlan_gopts_types[] = {
+        [BRIDGE_VLANDB_GOPTS_ID]                         = { .type = NETLINK_TYPE_U16 },
+        [BRIDGE_VLANDB_GOPTS_RANGE]                      = { .type = NETLINK_TYPE_U16 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_SNOOPING]             = { .type = NETLINK_TYPE_U8 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_IGMP_VERSION]         = { .type = NETLINK_TYPE_U8 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_MLD_VERSION]          = { .type = NETLINK_TYPE_U8 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_LAST_MEMBER_CNT]      = { .type = NETLINK_TYPE_U32 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_STARTUP_QUERY_CNT]    = { .type = NETLINK_TYPE_U32 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_LAST_MEMBER_INTVL]    = { .type = NETLINK_TYPE_U64 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_MEMBERSHIP_INTVL]     = { .type = NETLINK_TYPE_U64 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_QUERIER_INTVL]        = { .type = NETLINK_TYPE_U64 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_QUERY_INTVL]          = { .type = NETLINK_TYPE_U64 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_QUERY_RESPONSE_INTVL] = { .type = NETLINK_TYPE_U64 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_STARTUP_QUERY_INTVL]  = { .type = NETLINK_TYPE_U64 },
+        [BRIDGE_VLANDB_GOPTS_MCAST_QUERIER]              = { .type = NETLINK_TYPE_U8 },
+};
+
+DEFINE_TYPE_SYSTEM(rtnl_vlan_gopts);
+
+static const NLType rtnl_vlan_types[] = {
+        [BRIDGE_VLANDB_GLOBAL_OPTIONS] = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_vlan_gopts_type_system },
+};
+
+DEFINE_TYPE_SYSTEM(rtnl_vlan);
+
 static const NLType rtnl_types[] = {
         [RTM_NEWLINK]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_link_type_system,                .size = sizeof(struct ifinfomsg) },
         [RTM_DELLINK]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_link_type_system,                .size = sizeof(struct ifinfomsg) },
@@ -1223,6 +1248,9 @@ static const NLType rtnl_types[] = {
         [RTM_NEWMDB]       = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_mdb_type_system,                 .size = sizeof(struct br_port_msg) },
         [RTM_DELMDB]       = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_mdb_type_system,                 .size = sizeof(struct br_port_msg) },
         [RTM_GETMDB]       = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_mdb_type_system,                 .size = sizeof(struct br_port_msg) },
+        [RTM_NEWVLAN]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_vlan_type_system,                .size = sizeof(struct br_vlan_msg) },
+        [RTM_DELVLAN]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_vlan_type_system,                .size = sizeof(struct br_vlan_msg) },
+        [RTM_GETVLAN]      = { .type = NETLINK_TYPE_NESTED, .type_system = &rtnl_vlan_type_system,                .size = sizeof(struct br_vlan_msg) },
 };
 
 DEFINE_TYPE_SYSTEM(rtnl);

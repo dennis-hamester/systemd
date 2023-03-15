@@ -212,6 +212,8 @@ int sd_rtnl_message_set_tclass_handle(sd_netlink_message *m, uint32_t handle);
 
 int sd_rtnl_message_new_mdb(sd_netlink *rtnl, sd_netlink_message **ret, uint16_t nlmsg_type, int mdb_ifindex);
 
+int sd_rtnl_message_new_vlan(sd_netlink *nl, sd_netlink_message **ret, uint16_t msg_type, int ifindex);
+
 /* nfnl */
 int sd_nfnl_socket_open(sd_netlink **ret);
 int sd_nfnl_message_batch_begin(sd_netlink *nfnl, sd_netlink_message **ret);
