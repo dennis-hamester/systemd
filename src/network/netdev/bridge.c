@@ -27,6 +27,61 @@ DEFINE_STRING_TABLE_LOOKUP_WITH_BOOLEAN(multicast_router, MulticastRouter, _MULT
 DEFINE_CONFIG_PARSE_ENUM(config_parse_multicast_router, multicast_router, MulticastRouter,
                          "Failed to parse bridge multicast router setting");
 
+static BridgeVlan* bridge_vlan_free(BridgeVlan *vlan) {
+        if (!vlan)
+                return NULL;
+
+        if (vlan->bridge && vlan->section)
+                hashmap_remove(vlan->bridge->vlans, vlan->section);
+
+        if (vlan->section)
+                network_config_section_free(vlan->section);
+
+        return mfree(vlan);
+}
+
+DEFINE_NETWORK_SECTION_FUNCTIONS(BridgeVlan, bridge_vlan_free);
+
+static int bridge_vlan_new_static(Bridge *b, const char *filename, unsigned section_line, BridgeVlan **ret) {
+        _cleanup_(network_config_section_freep) NetworkConfigSection *n = NULL;
+        _cleanup_(bridge_vlan_freep) BridgeVlan *vlan = NULL;
+        int r;
+
+        assert(b);
+        assert(ret);
+        assert(filename);
+        assert(section_line > 0);
+
+        r = network_config_section_new(filename, section_line, &n);
+        if (r < 0)
+                return r;
+
+        vlan = hashmap_get(b->vlans, n);
+        if (vlan) {
+                *ret = TAKE_PTR(vlan);
+                return 0;
+        }
+
+        vlan = new(BridgeVlan, 1);
+        if (!vlan)
+                return -ENOMEM;
+
+        *vlan = (BridgeVlan) {
+                .bridge = b,
+                .section = TAKE_PTR(n),
+                .vid = -1,
+                .vid_end = -1,
+                .mcast_snooping = -1,
+        };
+
+        r = hashmap_ensure_put(&b->vlans, &network_config_hash_ops, vlan->section, vlan);
+        if (r < 0)
+                return r;
+
+        *ret = TAKE_PTR(vlan);
+        return 0;
+}
+
 /* callback for bridge netdev's parameter set */
 static int netdev_bridge_set_handler(sd_netlink *rtnl, sd_netlink_message *m, NetDev *netdev) {
         int r;
@@ -254,6 +309,111 @@ int config_parse_bridge_port_priority(
         return 0;
 }
 
+int config_parse_bridge_vlan(
+                const char *unit,
+                const char *filename,
+                unsigned line,
+                const char *section,
+                unsigned section_line,
+                const char *lvalue,
+                int ltype,
+                const char *rvalue,
+                void *data,
+                void *userdata) {
+        _cleanup_(bridge_vlan_free_or_set_invalidp) BridgeVlan *vlan = NULL;
+        Bridge *b;
+        uint16_t vid, vid_end;
+        int r;
+
+        assert(data);
+        b = BRIDGE(data);
+        assert(b);
+
+        r = bridge_vlan_new_static(b, filename, section_line, &vlan);
+        if (r < 0)
+                return log_oom();
+
+        r = parse_vid_range(rvalue, &vid, &vid_end);
+        if (r >= 0) {
+                vlan->vid = vid;
+                vlan->vid_end = vid_end;
+        } else {
+                log_syntax(unit, LOG_WARNING, filename, line, r,
+                           "Could not parse %s=\"%s\", ignoring assignment: %m", lvalue, rvalue);
+        }
+
+        TAKE_PTR(vlan);
+        return 0;
+}
+
+int config_parse_bridge_vlan_mcast_snooping(
+                const char *unit,
+                const char *filename,
+                unsigned line,
+                const char *section,
+                unsigned section_line,
+                const char *lvalue,
+                int ltype,
+                const char *rvalue,
+                void *data,
+                void *userdata) {
+        _cleanup_(bridge_vlan_free_or_set_invalidp) BridgeVlan *vlan = NULL;
+        Bridge *b;
+        int r;
+
+        assert(data);
+        b = BRIDGE(data);
+        assert(b);
+
+        r = bridge_vlan_new_static(b, filename, section_line, &vlan);
+        if (r < 0)
+                return log_oom();
+
+        r = parse_boolean(rvalue);
+        if (r >= 0)
+                vlan->mcast_snooping = r;
+        else
+                log_syntax(unit, LOG_WARNING, filename, line, r,
+                           "Could not parse %s=\"%s\", ignoring assignment: %m", lvalue, rvalue);
+
+        TAKE_PTR(vlan);
+        return 0;
+}
+
+int config_parse_bridge_vlan_mcast_querier(
+                const char *unit,
+                const char *filename,
+                unsigned line,
+                const char *section,
+                unsigned section_line,
+                const char *lvalue,
+                int ltype,
+                const char *rvalue,
+                void *data,
+                void *userdata) {
+        _cleanup_(bridge_vlan_free_or_set_invalidp) BridgeVlan *vlan = NULL;
+        Bridge *b;
+        int r;
+
+        assert(data);
+        b = BRIDGE(data);
+        assert(b);
+
+        r = bridge_vlan_new_static(b, filename, section_line, &vlan);
+        if (r < 0)
+                return log_oom();
+
+        r = parse_boolean(rvalue);
+        if (r >= 0)
+                vlan->mcast_querier = r;
+        else
+                log_syntax(unit, LOG_WARNING, filename, line, r,
+                           "Could not parse %s=\"%s\", ignoring assignment: %m", lvalue, rvalue);
+
+        TAKE_PTR(vlan);
+        return 0;
+}
+
 static void bridge_init(NetDev *n) {
         Bridge *b;
 
@@ -271,12 +431,42 @@ static void bridge_init(NetDev *n) {
         b->ageing_time = USEC_INFINITY;
 }
 
+static void bridge_done(NetDev *netdev) {
+        Bridge *b;
+
+        assert(netdev);
+        b = BRIDGE(netdev);
+        assert(b);
+
+        hashmap_free_with_destructor(b->vlans, bridge_vlan_free);
+}
+
+static int bridge_verify(NetDev *netdev, const char *filename) {
+        Bridge *b;
+        BridgeVlan *vlan;
+
+        assert(netdev);
+        b = BRIDGE(netdev);
+        assert(b);
+
+        HASHMAP_FOREACH(vlan, b->vlans) {
+                if (vlan->vid < 0) {
+                        log_netdev_warning_errno(netdev, SYNTHETIC_ERRNO(EINVAL),
+                                                 "%s: VLAN= is not set in BridgeVLAN. Ignoring section.", filename);
+                }
+        }
+
+        return 0;
+}
+
 const NetDevVTable bridge_vtable = {
         .object_size = sizeof(Bridge),
         .init = bridge_init,
-        .sections = NETDEV_COMMON_SECTIONS "Bridge\0",
+        .done = bridge_done,
+        .sections = NETDEV_COMMON_SECTIONS "Bridge\0BridgeVLAN\0",
         .post_create = netdev_bridge_post_create,
         .create_type = NETDEV_CREATE_MASTER,
+        .config_verify = bridge_verify,
         .iftype = ARPHRD_ETHER,
         .generate_mac = true,
 };

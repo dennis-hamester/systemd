@@ -7,6 +7,18 @@
 #define LINK_BRIDGE_PORT_PRIORITY_INVALID 128
 #define LINK_BRIDGE_PORT_PRIORITY_MAX 63
 
+typedef struct Bridge Bridge;
+
+typedef struct BridgeVlan {
+        Bridge *bridge;
+        NetworkConfigSection *section;
+
+        int16_t vid;
+        int16_t vid_end;
+        int mcast_snooping;
+        int mcast_querier;
+} BridgeVlan;
+
 typedef struct Bridge {
         NetDev meta;
 
@@ -24,6 +36,8 @@ typedef struct Bridge {
         usec_t hello_time;
         usec_t max_age;
         usec_t ageing_time;
+
+        Hashmap *vlans;
 } Bridge;
 
 typedef enum MulticastRouter {
@@ -44,3 +58,6 @@ MulticastRouter multicast_router_from_string(const char *s) _pure_;
 CONFIG_PARSER_PROTOTYPE(config_parse_multicast_router);
 CONFIG_PARSER_PROTOTYPE(config_parse_bridge_igmp_version);
 CONFIG_PARSER_PROTOTYPE(config_parse_bridge_port_priority);
+CONFIG_PARSER_PROTOTYPE(config_parse_bridge_vlan);
+CONFIG_PARSER_PROTOTYPE(config_parse_bridge_vlan_mcast_snooping);
+CONFIG_PARSER_PROTOTYPE(config_parse_bridge_vlan_mcast_querier);

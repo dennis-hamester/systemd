@@ -19,6 +19,7 @@
         "-BareUDP\0"                              \
         "-BatmanAdvanced\0"                       \
         "-Bond\0"                                 \
+        "-BridgeVLAN\0"                           \
         "-Bridge\0"                               \
         "-FooOverUDP\0"                           \
         "-GENEVE\0"                               \

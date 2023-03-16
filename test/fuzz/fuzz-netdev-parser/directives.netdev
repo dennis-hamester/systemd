@@ -56,6 +56,10 @@ GroupForwardMask=
 VLANFiltering=
 VLANProtocol=
 MulticastIGMPVersion=
+[BridgeVLAN]
+VLAN=
+MulticastSnooping=
+MulticastQuerier=
 [VRF]
 TableId=
 Table=
