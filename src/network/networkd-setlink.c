@@ -139,7 +139,32 @@ static int link_set_bridge_handler(sd_netlink *rtnl, sd_netlink_message *m, Link
 }
 
 static int link_set_bridge_vlan_handler(sd_netlink *rtnl, sd_netlink_message *m, Link *link) {
-        return set_link_handler_internal(rtnl, m, link, SET_LINK_BRIDGE_VLAN, /* ignore = */ false, NULL);
+        int r;
+        NetDev *n;
+
+        assert(link);
+
+        r = set_link_handler_internal(rtnl, m, link, SET_LINK_BRIDGE_VLAN, /* ignore = */ false, NULL);
+        if (r <= 0)
+                return r;
+
+        if (!link->network)
+                return 0;
+
+        if (link->network->bridge) {
+                n = link->network->bridge;
+        } else {
+                r = netdev_get(link->manager, link->ifname, &n);
+                if (r < 0)
+                        return r;
+                assert(n);
+        }
+
+        r = netdev_bridge_set_vlan_global_opts(n, link);
+        if (r < 0)
+                return r;
+
+        return 0;
 }
 
 static int link_set_can_handler(sd_netlink *rtnl, sd_netlink_message *m, Link *link) {

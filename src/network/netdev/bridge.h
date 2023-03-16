@@ -52,6 +52,8 @@ typedef enum MulticastRouter {
 DEFINE_NETDEV_CAST(BRIDGE, Bridge);
 extern const NetDevVTable bridge_vtable;
 
+int netdev_bridge_set_vlan_global_opts(NetDev *netdev, Link *link);
+
 const char* multicast_router_to_string(MulticastRouter i) _const_;
 MulticastRouter multicast_router_from_string(const char *s) _pure_;
 

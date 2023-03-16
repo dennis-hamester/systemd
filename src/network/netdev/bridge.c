@@ -459,6 +459,87 @@ static int bridge_verify(NetDev *netdev, const char *filename) {
         return 0;
 }
 
+static int bridge_set_vlan_global_opts_for_vid(NetDev *netdev, const BridgeVlan *vlan, uint16_t vid) {
+        _cleanup_(sd_netlink_message_unrefp) sd_netlink_message *req = NULL;
+        Bridge *b;
+        int r;
+
+        assert(netdev);
+        assert(vlan);
+        assert(vid >= vlan->vid);
+        assert(vid <= vlan->vid_end);
+
+        b = BRIDGE(netdev);
+        assert(b);
+
+        r = sd_rtnl_message_new_vlan(netdev->manager->rtnl, &req, RTM_NEWVLAN, netdev->ifindex);
+        if (r < 0)
+                return log_netdev_error_errno(netdev, r, "Could not allocate RTM_NEWVLAN message: %m");
+
+        r = sd_netlink_message_set_flags(req, NLM_F_REQUEST | NLM_F_ACK);
+        if (r < 0)
+                return log_netdev_error_errno(netdev, r, "Could not set netlink flags: %m");
+
+        r = sd_netlink_message_open_container(req, BRIDGE_VLANDB_GLOBAL_OPTIONS);
+        if (r < 0)
+                return log_netdev_error_errno(netdev, r, "Could not append BRIDGE_VLANDB_GLOBAL_OPTIONS attribute: %m");
+
+        r = sd_netlink_message_append_u16(req, BRIDGE_VLANDB_GOPTS_ID, vid);
+        if (r < 0)
+                return log_netdev_error_errno(netdev, r, "Could not append BRIDGE_VLANDB_GOPTS_ID attribute: %m");
+
+        if (vlan->mcast_snooping >= 0) {
+                r = sd_netlink_message_append_u8(req, BRIDGE_VLANDB_GOPTS_MCAST_SNOOPING, vlan->mcast_snooping);
+                if (r < 0)
+                        return log_netdev_error_errno(netdev, r, "Could not append BRIDGE_VLANDB_GOPTS_MCAST_SNOOPING attribute: %m");
+        }
+
+        if (vlan->mcast_querier >= 0) {
+                r = sd_netlink_message_append_u8(req, BRIDGE_VLANDB_GOPTS_MCAST_QUERIER, vlan->mcast_querier);
+                if (r < 0)
+                        return log_netdev_error_errno(netdev, r, "Could not append BRIDGE_VLANDB_GOPTS_MCAST_QUERIER attribute: %m");
+        }
+
+        r = sd_netlink_message_close_container(req);
+        if (r < 0)
+                return log_netdev_error_errno(netdev, r, "Could not append BRIDGE_VLANDB_GLOBAL_OPTIONS attribute: %m");
+
+        r = netlink_call_async(netdev->manager->rtnl, NULL, req, netdev_bridge_set_handler,
+                               netdev_destroy_callback, netdev);
+        if (r < 0)
+                return log_netdev_error_errno(netdev, r, "Could not send rtnetlink message: %m");
+
+        return 0;
+}
+
+int netdev_bridge_set_vlan_global_opts(NetDev *netdev, Link *link) {
+        Bridge *b;
+        BridgeVlan *vlan;
+
+        assert(netdev);
+        assert(link);
+        assert(link->network);
+        assert(link->network->use_br_vlan);
+
+        b = BRIDGE(netdev);
+        assert(b);
+
+        HASHMAP_FOREACH(vlan, b->vlans) {
+                uint16_t vid;
+
+                if ((vlan->vid < 0) || (vlan->vid_end < 0))
+                        continue;
+
+                for (vid = vlan->vid; vid <= vlan->vid_end; vid++) {
+                        uint32_t map = link->network->br_vid_bitmap[vid / 32];
+                        if (map & (UINT32_C(1) << (vid % 32)))
+                                bridge_set_vlan_global_opts_for_vid(netdev, vlan, vid);
+                }
+        }
+
+        return 0;
+}
+
 const NetDevVTable bridge_vtable = {
         .object_size = sizeof(Bridge),
         .init = bridge_init,
